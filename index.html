@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Object Detection</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 40px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #upload-btn {
+            background-color: #007aff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        #upload-btn:hover {
+            background-color: #005bb5;
+        }
+        #canvas-wrapper {
+            margin-top: 20px;
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+        canvas {
+            max-width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>YOLO11 Object Detection</h1>
+        <p>Upload an image to detect objects instantly.</p>
+        
+        <input type="file" id="image-input" accept="image/*">
+        <button id="upload-btn" onclick="processImage()">Detect Objects</button>
+
+        <div id="canvas-wrapper">
+            <canvas id="result-canvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        async function processImage() {
+            const fileInput = document.getElementById('image-input');
+            
+            if (fileInput.files.length === 0) {
+                alert("Please select an image first!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const canvas = document.getElementById('result-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 1. Create an image object to draw on the canvas
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            
+            img.onload = async () => {
+                // Set canvas size to match the image
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // Draw the original image
+                ctx.drawImage(img, 0, 0);
+
+                // 2. Prepare the file to send to our API
+                const formData = new FormData();
+                formData.append("file", file);
+
+                try {
+                    // Change button text while processing
+                    document.getElementById('upload-btn').innerText = "Processing...";
+                    
+                    // 3. Send POST request to FastAPI
+                    const response = await fetch('/detect', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+
+                    // 4. Draw bounding boxes based on API response
+                    data.detections.forEach(det => {
+                        const { x1, y1, x2, y2 } = det.box_coordinates;
+                        const width = x2 - x1;
+                        const height = y2 - y1;
+
+                        // Set box styles
+                        ctx.strokeStyle = "#00ff00"; // Neon green
+                        ctx.lineWidth = Math.max(2, img.width / 300); // Dynamic line width
+                        
+                        // Draw the box
+                        ctx.strokeRect(x1, y1, width, height);
+
+                        // Draw background for text
+                        ctx.fillStyle = "#00ff00";
+                        const text = `${det.class_name} ${Math.round(det.confidence * 100)}%`;
+                        const textWidth = ctx.measureText(text).width;
+                        const fontSize = Math.max(14, img.width / 50);
+                        
+                        ctx.font = `bold ${fontSize}px Arial`;
+                        ctx.fillRect(x1, y1 - fontSize - 4, textWidth + 10, fontSize + 4);
+                        
+                        // Draw text
+                        ctx.fillStyle = "#000000"; // Black text
+                        ctx.fillText(text, x1 + 4, y1 - 4);
+                    });
+                } catch (error) {
+                    console.error("Error connecting to API:", error);
+                    alert("Failed to process image. Make sure the API is running!");
+                } finally {
+                    // Reset button text
+                    document.getElementById('upload-btn').innerText = "Detect Objects";
+                }
+            };
+        }
+    </script>
+
+</body>
+</html>
