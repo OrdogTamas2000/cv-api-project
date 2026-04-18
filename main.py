@@ -25,12 +25,6 @@ print("Loading YOLO11n model...")
 model = YOLO("yolo11n.pt")
 print("Model loaded successfully!")
 
-# Serve the Web UI (Replaced the JSON health check)
-@app.get("/")
-async def serve_ui():
-    # This sends our index.html file to the browser
-    return FileResponse("index.html")
-
 # Object Detection endpoint (POST request)
 @app.post("/detect")
 async def detect_objects(file: UploadFile = File(...)):
